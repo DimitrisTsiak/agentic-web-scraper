@@ -18,9 +18,10 @@ class StaticFetcher:
     Lightweight, fast HTTP fetcher with integrated safety checks,
     robots.txt compliance, and automatic content sanitization.
     """
-    def __init__(self, rate_limiter: Optional[DomainRateLimiter] = None, timeout: float = 10.0):
+    def __init__(self, rate_limiter: Optional[DomainRateLimiter] = None, timeout: float = 10.0, ignore_robots: bool = False):
         self.rate_limiter = rate_limiter or DomainRateLimiter()
         self.timeout = timeout
+        self.ignore_robots = ignore_robots
 
     def fetch(self, url: str, extra_headers: Optional[Dict[str, str]] = None) -> FetchResult:
         # 1. Safety Check: SSRF and Protocol Validation
@@ -35,7 +36,8 @@ class StaticFetcher:
 
         # 2. Safety Check: Rate Limiting & Robots.txt
         try:
-            self.rate_limiter.wait_if_needed(url)
+            if not self.ignore_robots:
+                self.rate_limiter.wait_if_needed(url)
         except PermissionError as e:
             return FetchResult(
                 url=url,
@@ -43,6 +45,7 @@ class StaticFetcher:
                 success=False,
                 error_message=str(e)
             )
+
 
         headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
         start_time = time.time()

@@ -40,6 +40,7 @@ def build_cli():
     fetch_parser = subparsers.add_parser("fetch", help="Fetch a URL safely and display or save clean text")
     fetch_parser.add_argument("--url", required=True, help="Target website URL")
     fetch_parser.add_argument("--out", help="Optional output filepath (.txt or .html)")
+    fetch_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
 
     # Command 2: extract (scrapes structured items using CSS rules)
     extract_parser = subparsers.add_parser("extract", help="Extract structured records using CSS rules")
@@ -47,14 +48,17 @@ def build_cli():
     extract_parser.add_argument("--container", required=True, help="CSS selector for repeated container item (e.g. '.product-card')")
     extract_parser.add_argument("--fields", required=True, help="Field mapping e.g. 'title=.name,price=.price,link=a::attr(href)'")
     extract_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
+    extract_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
 
     # Command 3: ai-extract (scrapes structured items using AI natural language prompt)
     ai_parser = subparsers.add_parser("ai-extract", help="Extract structured data using AI natural language prompt")
     ai_parser.add_argument("--url", required=True, help="Target website URL")
     ai_parser.add_argument("--prompt", required=True, help="Natural language extraction goal e.g. 'Extract all product names, prices, and ratings'")
     ai_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
+    ai_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
 
     return parser
+
 
 
 def main():
@@ -65,7 +69,9 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    fetcher = StaticFetcher()
+    ignore_robots = getattr(args, "ignore_robots", False)
+    fetcher = StaticFetcher(ignore_robots=ignore_robots)
+
 
     if args.command == "fetch":
         print(f"[AGENT] Safely fetching URL: {args.url}")
