@@ -48,7 +48,14 @@ def build_cli():
     extract_parser.add_argument("--fields", required=True, help="Field mapping e.g. 'title=.name,price=.price,link=a::attr(href)'")
     extract_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
 
+    # Command 3: ai-extract (scrapes structured items using AI natural language prompt)
+    ai_parser = subparsers.add_parser("ai-extract", help="Extract structured data using AI natural language prompt")
+    ai_parser.add_argument("--url", required=True, help="Target website URL")
+    ai_parser.add_argument("--prompt", required=True, help="Natural language extraction goal e.g. 'Extract all product names, prices, and ratings'")
+    ai_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
+
     return parser
+
 
 def main():
     parser = build_cli()
@@ -111,6 +118,45 @@ def main():
         print(f"[SAVED] Results exported to: {out_path}")
         print("\nPreview:")
         print(DataExporter.to_markdown_table(records[:5]))
+
+    elif args.command == "ai-extract":
+        from src.extractor.ai_extractor import AIExtractor
+
+        print(f"[AGENT] Safely fetching URL: {args.url}")
+        result = fetcher.fetch(args.url)
+
+        if not result.success:
+            print(f"[ERROR] {result.error_message}")
+            sys.exit(1)
+
+        print(f"[AGENT] Running AI extraction with prompt: '{args.prompt}'...")
+        try:
+            ai_extractor = AIExtractor()
+            extracted_data = ai_extractor.extract(result.clean_text, args.prompt)
+        except Exception as e:
+            print(f"[ERROR] {str(e)}")
+            sys.exit(1)
+
+        records = extracted_data if isinstance(extracted_data, list) else [extracted_data]
+        print(f"[AGENT] Extracted {len(records)} record(s).")
+
+        out_path = args.out
+        if out_path.endswith(".json"):
+            DataExporter.to_json(records, out_path)
+        elif out_path.endswith(".csv"):
+            DataExporter.to_csv(records, out_path)
+        elif out_path.endswith(".md"):
+            md_content = DataExporter.to_markdown_table(records)
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
+        else:
+            DataExporter.to_json(records, out_path)
+
+        print(f"[SAVED] Results exported to: {out_path}")
+        if records:
+            print("\nPreview:")
+            print(DataExporter.to_markdown_table(records[:5]))
+
 
 if __name__ == "__main__":
     main()
