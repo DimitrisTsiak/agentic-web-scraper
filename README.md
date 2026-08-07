@@ -1,12 +1,13 @@
 # Web Scraper Agent
 
-A safe, polite, and modular web scraping CLI agent with support for Google Gemini AI natural language parsing and structured data exporting.
+A safe, polite, and modular web scraping CLI agent with support for Google Gemini AI natural language parsing, multi-page pagination crawling, and structured data exporting.
 
 ## Features
 
 - Safety and Compliance: SSRF protection, protocol whitelisting (HTTP/HTTPS only), robots.txt parsing, domain rate limiting, and HTML script/payload sanitization.
 - Static Fetching Engine: Fast HTTP page fetching with automatic content cleanup and error handling.
 - AI-Powered Extraction: Natural language data parsing using Google Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`).
+- Multi-Page Crawler: Automated pagination detection and multi-page data aggregation.
 - Data Exporting: Export extracted records into JSON, CSV, or Markdown table formats.
 
 ## Installation
@@ -41,9 +42,15 @@ python main.py fetch --url "https://example.com" --out "output/clean_text.txt"
 ```
 
 ### 2. AI-Powered Extraction (Google Gemini)
-Extract structured data from any web page using a natural language prompt:
+Extract structured data from any single web page using a natural language prompt:
 ```bash
 python main.py ai-extract --url "https://books.toscrape.com/" --prompt "Extract all book titles and prices" --out "output/books.json"
+```
+
+### 3. Multi-Page Crawler
+Crawl across multiple paginated pages and combine extracted datasets:
+```bash
+python main.py crawl --url "https://books.toscrape.com/" --prompt "Extract all book titles and prices" --max-pages 5 --out "output/all_books.csv"
 ```
 
 ## Project Structure
@@ -56,6 +63,7 @@ web-scrapper-agent/
 ├── src/
 │   ├── safety/               # SSRF, robots.txt, rate limiter, and sanitizer
 │   ├── fetcher/              # HTTP fetcher engine and models
-│   └── extractor/            # AI (Gemini) extractor and exporter modules
+│   ├── extractor/            # AI (Gemini) extractor and exporter modules
+│   └── crawler/              # Multi-page pagination crawler module
 └── output/                   # Generated output files
 ```

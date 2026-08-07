@@ -57,7 +57,16 @@ def build_cli():
     ai_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
     ai_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
 
+    # Command 4: crawl (multi-page crawler using AI extraction)
+    crawl_parser = subparsers.add_parser("crawl", help="Crawl across multiple paginated pages using AI extraction")
+    crawl_parser.add_argument("--url", required=True, help="Starting website URL")
+    crawl_parser.add_argument("--prompt", required=True, help="Natural language extraction goal e.g. 'Extract all products'")
+    crawl_parser.add_argument("--max-pages", type=int, default=3, help="Maximum number of paginated pages to crawl (default: 3)")
+    crawl_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
+    crawl_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
+
     return parser
+
 
 
 
@@ -162,6 +171,33 @@ def main():
         if records:
             print("\nPreview:")
             print(DataExporter.to_markdown_table(records[:5]))
+
+    elif args.command == "crawl":
+        from src.crawler.crawler import MultiPageCrawler
+
+        print(f"[AGENT] Starting multi-page crawl starting at: {args.url} (max_pages={args.max_pages})")
+        crawler = MultiPageCrawler(fetcher=fetcher)
+
+        records = crawler.crawl_and_extract(args.url, args.prompt, max_pages=args.max_pages)
+        print(f"[AGENT] Crawl complete. Extracted a total of {len(records)} record(s) across pages.")
+
+        out_path = args.out
+        if out_path.endswith(".json"):
+            DataExporter.to_json(records, out_path)
+        elif out_path.endswith(".csv"):
+            DataExporter.to_csv(records, out_path)
+        elif out_path.endswith(".md"):
+            md_content = DataExporter.to_markdown_table(records)
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
+        else:
+            DataExporter.to_json(records, out_path)
+
+        print(f"[SAVED] Results exported to: {out_path}")
+        if records:
+            print("\nPreview:")
+            print(DataExporter.to_markdown_table(records[:5]))
+
 
 
 if __name__ == "__main__":
