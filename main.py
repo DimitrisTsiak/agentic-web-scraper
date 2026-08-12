@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import subprocess
 from typing import Dict
 
 # Fix Windows console encoding issues if needed
@@ -32,7 +33,7 @@ def parse_fields_arg(fields_str: str) -> Dict[str, str]:
 
 def build_cli():
     parser = argparse.ArgumentParser(
-        description="[Web Scraper Agent] Safe, polite, and structured web scraping CLI"
+        description="[Web Scraper Agent] Safe, polite, and structured web scraping CLI & Web Dashboard"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
@@ -57,7 +58,13 @@ def build_cli():
     ai_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
     ai_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
 
-    # Command 4: crawl (multi-page crawler using AI extraction)
+    # Command 4: qa (ask natural language questions grounded in webpage content)
+    qa_parser = subparsers.add_parser("qa", help="Ask a question about a webpage's content using AI Q&A")
+    qa_parser.add_argument("--url", required=True, help="Target website URL")
+    qa_parser.add_argument("--question", required=True, help="Question prompt e.g. 'Are there any must have CS books available?'")
+    qa_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
+
+    # Command 5: crawl (multi-page crawler using AI extraction)
     crawl_parser = subparsers.add_parser("crawl", help="Crawl across multiple paginated pages using AI extraction")
     crawl_parser.add_argument("--url", required=True, help="Starting website URL")
     crawl_parser.add_argument("--prompt", required=True, help="Natural language extraction goal e.g. 'Extract all products'")
@@ -65,9 +72,16 @@ def build_cli():
     crawl_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
     crawl_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
 
+    # Command 6: server (launches FastAPI REST server)
+    server_parser = subparsers.add_parser("server", help="Launch FastAPI REST API server")
+    server_parser.add_argument("--host", default="127.0.0.1", help="Host address (default: 127.0.0.1)")
+    server_parser.add_argument("--port", type=int, default=8000, help="Port number (default: 8000)")
+
+    # Command 7: dashboard (launches Streamlit Web Dashboard)
+    dash_parser = subparsers.add_parser("dashboard", help="Launch Streamlit Web Dashboard UI")
+    dash_parser.add_argument("--port", type=int, default=8501, help="Port number (default: 8501)")
+
     return parser
-
-
 
 
 def main():
@@ -80,7 +94,6 @@ def main():
 
     ignore_robots = getattr(args, "ignore_robots", False)
     fetcher = StaticFetcher(ignore_robots=ignore_robots)
-
 
     if args.command == "fetch":
         print(f"[AGENT] Safely fetching URL: {args.url}")
@@ -172,6 +185,29 @@ def main():
             print("\nPreview:")
             print(DataExporter.to_markdown_table(records[:5]))
 
+    elif args.command == "qa":
+        from src.agent.qa_engine import AIQAEngine
+
+        print(f"[AGENT] Safely fetching URL: {args.url}")
+        result = fetcher.fetch(args.url)
+
+        if not result.success:
+            print(f"[ERROR] {result.error_message}")
+            sys.exit(1)
+
+        print(f"[AGENT] Asking AI Q&A Engine: '{args.question}'...")
+        try:
+            qa_engine = AIQAEngine()
+            qa_res = qa_engine.answer_question(result.clean_text, args.question)
+            print("\n" + "="*50)
+            print(f"QUESTION: {args.question}")
+            print("="*50)
+            print(qa_res["answer"])
+            print("="*50 + "\n")
+        except Exception as e:
+            print(f"[ERROR] {str(e)}")
+            sys.exit(1)
+
     elif args.command == "crawl":
         from src.crawler.crawler import MultiPageCrawler
 
@@ -198,6 +234,15 @@ def main():
             print("\nPreview:")
             print(DataExporter.to_markdown_table(records[:5]))
 
+    elif args.command == "server":
+        import uvicorn
+        print(f"[AGENT] Starting FastAPI REST API server at http://{args.host}:{args.port}")
+        uvicorn.run("src.api.app:app", host=args.host, port=args.port, reload=False)
+
+    elif args.command == "dashboard":
+        print(f"[AGENT] Launching Streamlit Web Dashboard on port {args.port}...")
+        cmd = [sys.executable, "-m", "streamlit", "run", "dashboard.py", "--server.port", str(args.port)]
+        subprocess.run(cmd)
 
 
 if __name__ == "__main__":
