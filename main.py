@@ -33,44 +33,45 @@ def parse_fields_arg(fields_str: str) -> Dict[str, str]:
 
 def build_cli():
     parser = argparse.ArgumentParser(
-        description="[Web Scraper Agent] Safe, polite, and structured web scraping CLI & Web Dashboard"
+        description="Web Scraper Agent - CLI and Web Interface for web content fetching, data extraction, and querying."
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
-    # Command 1: fetch (fetches HTML/text with safety checks)
-    fetch_parser = subparsers.add_parser("fetch", help="Fetch a URL safely and display or save clean text")
-    fetch_parser.add_argument("--url", required=True, help="Target website URL")
-    fetch_parser.add_argument("--out", help="Optional output filepath (.txt or .html)")
-    fetch_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
+    # Command 1: fetch
+    fetch_parser = subparsers.add_parser("fetch", help="Fetch a URL and return sanitized text content")
+    fetch_parser.add_argument("--url", required=True, help="Target URL")
+    fetch_parser.add_argument("--out", help="Output filepath (.txt or .html)")
+    fetch_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions")
 
-    # Command 2: extract (scrapes structured items using CSS rules)
-    extract_parser = subparsers.add_parser("extract", help="Extract structured records using CSS rules")
-    extract_parser.add_argument("--url", required=True, help="Target website URL")
+    # Command 2: extract
+    extract_parser = subparsers.add_parser("extract", help="Extract structured records using CSS selectors")
+    extract_parser.add_argument("--url", required=True, help="Target URL")
     extract_parser.add_argument("--container", required=True, help="CSS selector for repeated container item (e.g. '.product-card')")
-    extract_parser.add_argument("--fields", required=True, help="Field mapping e.g. 'title=.name,price=.price,link=a::attr(href)'")
+    extract_parser.add_argument("--fields", required=True, help="Field mapping (e.g. 'title=.name,price=.price,link=a::attr(href)')")
     extract_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
-    extract_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
+    extract_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions")
 
-    # Command 3: ai-extract (scrapes structured items using AI natural language prompt)
-    ai_parser = subparsers.add_parser("ai-extract", help="Extract structured data using AI natural language prompt")
-    ai_parser.add_argument("--url", required=True, help="Target website URL")
-    ai_parser.add_argument("--prompt", required=True, help="Natural language extraction goal e.g. 'Extract all product names, prices, and ratings'")
+    # Command 3: ai-extract
+    ai_parser = subparsers.add_parser("ai-extract", help="Extract structured data using natural language instructions")
+    ai_parser.add_argument("--url", required=True, help="Target URL")
+    ai_parser.add_argument("--prompt", required=True, help="Extraction instruction prompt")
     ai_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
-    ai_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
+    ai_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions")
 
-    # Command 4: qa (ask natural language questions grounded in webpage content)
-    qa_parser = subparsers.add_parser("qa", help="Ask a question about a webpage's content using AI Q&A")
-    qa_parser.add_argument("--url", required=True, help="Target website URL")
-    qa_parser.add_argument("--question", required=True, help="Question prompt e.g. 'Are there any must have CS books available?'")
-    qa_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
+    # Command 4: qa
+    qa_parser = subparsers.add_parser("qa", help="Query web page content using natural language")
+    qa_parser.add_argument("--url", required=True, help="Target URL")
+    qa_parser.add_argument("--question", required=True, help="Query string")
+    qa_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions")
 
-    # Command 5: crawl (multi-page crawler using AI extraction)
-    crawl_parser = subparsers.add_parser("crawl", help="Crawl across multiple paginated pages using AI extraction")
-    crawl_parser.add_argument("--url", required=True, help="Starting website URL")
-    crawl_parser.add_argument("--prompt", required=True, help="Natural language extraction goal e.g. 'Extract all products'")
-    crawl_parser.add_argument("--max-pages", type=int, default=3, help="Maximum number of paginated pages to crawl (default: 3)")
+    # Command 5: crawl
+    crawl_parser = subparsers.add_parser("crawl", help="Crawl paginated web pages and extract aggregated data")
+    crawl_parser.add_argument("--url", required=True, help="Starting URL")
+    crawl_parser.add_argument("--prompt", required=True, help="Extraction instruction prompt")
+    crawl_parser.add_argument("--max-pages", type=int, default=3, help="Maximum pages to crawl (default: 3)")
     crawl_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
-    crawl_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions (use responsibly)")
+    crawl_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions")
+
 
     # Command 6: server (launches FastAPI REST server)
     server_parser = subparsers.add_parser("server", help="Launch FastAPI REST API server")
