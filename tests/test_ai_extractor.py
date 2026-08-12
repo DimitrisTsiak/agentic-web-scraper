@@ -9,22 +9,13 @@ class TestAIExtractor(unittest.TestCase):
             extractor.extract("Sample text", "Extract title")
         self.assertIn("GEMINI_API_KEY is not configured", str(ctx.exception))
 
-    @patch("requests.post")
-    def test_successful_gemini_ai_extraction(self, mock_post):
+    @patch("src.extractor.ai_extractor.genai.Client")
+    def test_successful_gemini_ai_extraction(self, mock_client_cls):
+        mock_client = MagicMock()
         mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "candidates": [
-                {
-                    "content": {
-                        "parts": [
-                            {"text": '[{"title": "Gemini Item", "price": "$15"}]'}
-                        ]
-                    }
-                }
-            ]
-        }
-        mock_post.return_value = mock_response
+        mock_response.text = '[{"title": "Gemini Item", "price": "$15"}]'
+        mock_client.models.generate_content.return_value = mock_response
+        mock_client_cls.return_value = mock_client
 
         extractor = AIExtractor(api_key="valid-gemini-key")
         result = extractor.extract("<html>Sample page content</html>", "Extract items")

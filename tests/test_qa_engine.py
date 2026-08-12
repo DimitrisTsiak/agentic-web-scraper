@@ -13,20 +13,13 @@ def test_qa_engine_empty_text():
     assert "No content was extracted" in result["answer"]
     assert result["content_length"] == 0
 
-@patch("src.agent.qa_engine.requests.post")
-def test_qa_engine_success(mock_post):
+@patch("src.agent.qa_engine.genai.Client")
+def test_qa_engine_success(mock_client_cls):
+    mock_client = MagicMock()
     mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [{"text": "Yes, 'Designing Data-Intensive Applications' is available for $45.00."}]
-                }
-            }
-        ]
-    }
-    mock_post.return_value = mock_response
+    mock_response.text = "Yes, 'Designing Data-Intensive Applications' is available for $45.00."
+    mock_client.models.generate_content.return_value = mock_response
+    mock_client_cls.return_value = mock_client
 
     engine = AIQAEngine(api_key="test_api_key")
     result = engine.answer_question("Book: Designing Data-Intensive Applications, Price: $45.00", "What CS books are available?")
