@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Union, Optional
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from src.extractor.schemas import resolve_schema
 
 load_dotenv()
 
@@ -42,22 +43,38 @@ class AIExtractor:
             )
         return key
 
-    def extract(self, clean_text: str, instruction: str) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+    def extract(
+        self, 
+        clean_text: str, 
+        instruction: str, 
+        schema: Optional[Any] = None
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Extracts structured data from clean webpage text using Google Gen AI SDK.
+        If a schema is provided, Gemini will strictly enforce the output structure
+        using Pydantic models.
         """
         key = self._get_api_key()
         prompt_text = f"{SYSTEM_PROMPT}\n\nUSER EXTRACTION GOAL: {instruction}\n\nWEBPAGE CONTENT:\n{clean_text[:15000]}"
 
+        resolved_model = None
+        if schema is not None:
+            resolved_model = resolve_schema(schema)
+
         try:
             client = genai.Client(api_key=key)
+
+            config_kwargs: Dict[str, Any] = {
+                "temperature": 0.1,
+                "response_mime_type": "application/json"
+            }
+            if resolved_model is not None:
+                config_kwargs["response_schema"] = list[resolved_model]
+
             response = client.models.generate_content(
                 model=self.model,
                 contents=prompt_text,
-                config=types.GenerateContentConfig(
-                    temperature=0.1,
-                    response_mime_type="application/json"
-                )
+                config=types.GenerateContentConfig(**config_kwargs)
             )
 
             raw_text = (response.text or "").strip()
@@ -66,7 +83,17 @@ class AIExtractor:
             clean_json_str = re.sub(r"^```json\s*", "", raw_text, flags=re.MULTILINE)
             clean_json_str = re.sub(r"```$", "", clean_json_str, flags=re.MULTILINE).strip()
 
-            return json.loads(clean_json_str)
+            parsed = json.loads(clean_json_str)
+
+            # If schema was enforced, validate and dump cleanly with Pydantic
+            if resolved_model is not None:
+                if isinstance(parsed, list):
+                    return [resolved_model.model_validate(item).model_dump() for item in parsed]
+                elif isinstance(parsed, dict):
+                    return resolved_model.model_validate(parsed).model_dump()
+
+            return parsed
 
         except Exception as e:
             raise RuntimeError(f"Gemini AI Extraction failed: {str(e)}")
+

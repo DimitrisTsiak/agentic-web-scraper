@@ -50,5 +50,32 @@ class TestMultiPageCrawler(unittest.TestCase):
         self.assertEqual(records[0]["title"], "Item 1")
         self.assertEqual(records[1]["title"], "Item 2")
 
+    def test_crawl_and_extract_with_schema(self):
+        mock_fetcher = MagicMock()
+        mock_ai_extractor = MagicMock()
+
+        res = FetchResult(
+            url="https://example.com/page/1",
+            status_code=200,
+            success=True,
+            raw_html='<html><body><h1>P1</h1></body></html>',
+            clean_text="Page 1 Content"
+        )
+        mock_fetcher.fetch.return_value = res
+        mock_ai_extractor.extract.return_value = [{"title": "Item 1", "price": 10.0}]
+
+        crawler = MultiPageCrawler(fetcher=mock_fetcher, ai_extractor=mock_ai_extractor)
+        records = crawler.crawl_and_extract(
+            "https://example.com/page/1", 
+            "Extract items", 
+            max_pages=1, 
+            schema="product"
+        )
+
+        self.assertEqual(len(records), 1)
+        mock_ai_extractor.extract.assert_called_once_with(
+            "Page 1 Content", "Extract items", schema="product"
+        )
+
 if __name__ == "__main__":
     unittest.main()
