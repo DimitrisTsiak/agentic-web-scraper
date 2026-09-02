@@ -1,6 +1,6 @@
 import uuid
 import threading
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -81,6 +81,13 @@ def extract_rules(req: ExtractRequest):
         "records": records,
     }
 
+def _resolve_request_schema(preset: Optional[str], fields: Optional[Dict[str, str]]) -> Optional[Any]:
+    if preset:
+        return preset
+    if fields:
+        return fields
+    return None
+
 @app.post("/api/ai-extract")
 def extract_ai(req: AIExtractRequest):
     fetcher = StaticFetcher(ignore_robots=req.ignore_robots)
@@ -90,7 +97,8 @@ def extract_ai(req: AIExtractRequest):
 
     try:
         extractor = AIExtractor()
-        data = extractor.extract(res.clean_text, req.prompt)
+        schema_arg = _resolve_request_schema(req.schema_preset, req.schema_fields)
+        data = extractor.extract(res.clean_text, req.prompt, schema=schema_arg)
         records = data if isinstance(data, list) else [data]
         return {
             "url": req.url,
@@ -140,7 +148,8 @@ def _run_crawl_task(task_id: str, req: CrawlRequest):
     crawler = MultiPageCrawler(fetcher=fetcher)
 
     try:
-        records = crawler.crawl_and_extract(req.url, req.prompt, max_pages=req.max_pages)
+        schema_arg = _resolve_request_schema(req.schema_preset, req.schema_fields)
+        records = crawler.crawl_and_extract(req.url, req.prompt, max_pages=req.max_pages, schema=schema_arg)
         with tasks_lock:
             tasks_db[task_id].status = "completed"
             tasks_db[task_id].records_count = len(records)

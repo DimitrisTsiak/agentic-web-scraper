@@ -22,6 +22,8 @@ class ExtractRequest(BaseModel):
 class AIExtractRequest(BaseModel):
     url: str
     prompt: str
+    schema_preset: Optional[str] = None
+    schema_fields: Optional[Dict[str, str]] = None
     ignore_robots: bool = False
 
 class QARequest(BaseModel):
@@ -40,6 +42,8 @@ class CrawlRequest(BaseModel):
     url: str
     prompt: str
     max_pages: int = Field(default=3, ge=1, le=20)
+    schema_preset: Optional[str] = None
+    schema_fields: Optional[Dict[str, str]] = None
     ignore_robots: bool = False
 
 class TaskStatusResponse(BaseModel):

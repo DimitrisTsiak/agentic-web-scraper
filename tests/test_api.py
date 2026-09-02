@@ -73,3 +73,32 @@ def test_crawl_task_creation_and_status():
         assert status_res.status_code == 200
         status_data = status_res.json()
         assert status_data["task_id"] == task_id
+
+@patch("src.api.app.AIExtractor")
+@patch("src.api.app.StaticFetcher")
+def test_ai_extract_endpoint_with_schema(mock_fetcher_cls, mock_extractor_cls):
+    mock_fetcher = MagicMock()
+    mock_res = MagicMock()
+    mock_res.success = True
+    mock_res.clean_text = "Page with books"
+    mock_fetcher.fetch.return_value = mock_res
+    mock_fetcher_cls.return_value = mock_fetcher
+
+    mock_extractor = MagicMock()
+    mock_extractor.extract.return_value = [{"title": "Python Book", "price": 29.99}]
+    mock_extractor_cls.return_value = mock_extractor
+
+    response = client.post(
+        "/api/ai-extract",
+        json={
+            "url": "https://example.com",
+            "prompt": "Extract products",
+            "schema_preset": "product"
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["count"] == 1
+    assert data["records"][0]["title"] == "Python Book"
+    mock_extractor.extract.assert_called_once_with("Page with books", "Extract products", schema="product")
+
