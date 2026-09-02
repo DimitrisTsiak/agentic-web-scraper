@@ -135,7 +135,27 @@ with tab_extract:
 
     records = []
     if extract_mode == "Natural Language Instruction":
-        ai_prompt = st.text_area("Instruction", value="Extract all product titles and prices", height=70)
+        col_p, col_s = st.columns([2, 1])
+        with col_p:
+            ai_prompt = st.text_area("Instruction", value="Extract all product titles and prices", height=70)
+        with col_s:
+            schema_choice = st.selectbox(
+                "Schema Enforcement (Pydantic)", 
+                options=["None (Free-form)", "Preset: Product", "Preset: Article", "Preset: Job Posting", "Custom Field Spec"],
+                index=0
+            )
+
+        selected_schema = None
+        if schema_choice == "Preset: Product":
+            selected_schema = "product"
+        elif schema_choice == "Preset: Article":
+            selected_schema = "article"
+        elif schema_choice == "Preset: Job Posting":
+            selected_schema = "job"
+        elif schema_choice == "Custom Field Spec":
+            custom_spec = st.text_input("Field Specification", value="title:str,price:float,rating:float,in_stock:bool", help="Format: field:type,field2:type (e.g. title:str,price:float)")
+            selected_schema = custom_spec.strip() if custom_spec.strip() else None
+
         if st.button("Run Extraction", type="primary", use_container_width=True):
             with st.spinner("Fetching and extracting data..."):
                 fetcher = StaticFetcher(timeout=timeout_sec, ignore_robots=ignore_robots)
@@ -145,7 +165,7 @@ with tab_extract:
                 else:
                     try:
                         extractor = AIExtractor()
-                        data = extractor.extract(res.clean_text, ai_prompt)
+                        data = extractor.extract(res.clean_text, ai_prompt, schema=selected_schema)
                         records = data if isinstance(data, list) else [data]
                         st.session_state["extracted_records"] = records
                     except Exception as e:
@@ -200,7 +220,29 @@ with tab_crawl:
     st.caption("Traverse paginated web pages sequentially and aggregate extracted datasets.")
 
     crawl_url = st.text_input("Starting URL", value="https://books.toscrape.com/", key="crawl_url")
-    crawl_prompt = st.text_input("Extraction Instruction", value="Extract all product titles and prices", key="crawl_prompt")
+    
+    col_cp, col_cs = st.columns([2, 1])
+    with col_cp:
+        crawl_prompt = st.text_input("Extraction Instruction", value="Extract all product titles and prices", key="crawl_prompt")
+    with col_cs:
+        crawl_schema_choice = st.selectbox(
+            "Schema Enforcement (Pydantic)", 
+            options=["None (Free-form)", "Preset: Product", "Preset: Article", "Preset: Job Posting", "Custom Field Spec"],
+            index=0,
+            key="crawl_schema_choice"
+        )
+
+    crawl_schema = None
+    if crawl_schema_choice == "Preset: Product":
+        crawl_schema = "product"
+    elif crawl_schema_choice == "Preset: Article":
+        crawl_schema = "article"
+    elif crawl_schema_choice == "Preset: Job Posting":
+        crawl_schema = "job"
+    elif crawl_schema_choice == "Custom Field Spec":
+        crawl_spec = st.text_input("Field Specification", value="title:str,price:float,rating:float", key="crawl_spec")
+        crawl_schema = crawl_spec.strip() if crawl_spec.strip() else None
+
     max_pages = st.slider("Maximum Pages", min_value=1, max_value=10, value=3)
 
     if st.button("Run Crawl", type="primary", use_container_width=True):
@@ -212,7 +254,7 @@ with tab_crawl:
         status_box.info(f"Crawling starting from {crawl_url} (Limit: {max_pages} pages)...")
 
         try:
-            records = crawler.crawl_and_extract(crawl_url, crawl_prompt, max_pages=max_pages)
+            records = crawler.crawl_and_extract(crawl_url, crawl_prompt, max_pages=max_pages, schema=crawl_schema)
             progress_bar.progress(100)
             status_box.success(f"Crawl finished. Extracted {len(records)} items across {max_pages} pages.")
             st.session_state["crawl_records"] = records

@@ -60,16 +60,23 @@ Query webpage content using natural language:
 python main.py qa --url "https://books.toscrape.com/" --question "Are there any must-have computer science books available?"
 ```
 
-#### 3. AI-Powered Extraction (Google Gemini)
-Extract structured data from any single web page using a natural language prompt:
+#### 3. AI-Powered Extraction (Google Gemini with Pydantic Schemas)
+Extract structured data from any single web page using natural language and optional Pydantic schema enforcement:
 ```bash
-python main.py ai-extract --url "https://books.toscrape.com/" --prompt "Extract all book titles and prices" --out "output/books.json"
+# Free-form extraction:
+python main.py ai-extract --url "https://books.toscrape.com/" --prompt "Extract all books" --out "output/books.json"
+
+# Strict schema enforcement using a preset ('product', 'article', 'job'):
+python main.py ai-extract --url "https://books.toscrape.com/" --prompt "Extract all books" --schema product --out "output/books.json"
+
+# Strict schema enforcement using custom field specs:
+python main.py ai-extract --url "https://books.toscrape.com/" --prompt "Extract all books" --schema "title:str,price:float,rating:float" --out "output/books.json"
 ```
 
 #### 4. Multi-Page Crawler
 Crawl across multiple paginated pages and combine extracted datasets:
 ```bash
-python main.py crawl --url "https://books.toscrape.com/" --prompt "Extract all book titles and prices" --max-pages 5 --out "output/all_books.csv"
+python main.py crawl --url "https://books.toscrape.com/" --prompt "Extract all books" --schema product --max-pages 5 --out "output/all_books.csv"
 ```
 
 ## Project Structure
