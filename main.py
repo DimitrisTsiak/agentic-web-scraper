@@ -55,6 +55,7 @@ def build_cli():
     ai_parser = subparsers.add_parser("ai-extract", help="Extract structured data using natural language instructions")
     ai_parser.add_argument("--url", required=True, help="Target URL")
     ai_parser.add_argument("--prompt", required=True, help="Extraction instruction prompt")
+    ai_parser.add_argument("--schema", help="Pydantic schema preset ('product', 'article', 'job'), field specs ('title:str,price:float'), or JSON schema file")
     ai_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
     ai_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions")
 
@@ -68,6 +69,7 @@ def build_cli():
     crawl_parser = subparsers.add_parser("crawl", help="Crawl paginated web pages and extract aggregated data")
     crawl_parser.add_argument("--url", required=True, help="Starting URL")
     crawl_parser.add_argument("--prompt", required=True, help="Extraction instruction prompt")
+    crawl_parser.add_argument("--schema", help="Pydantic schema preset ('product', 'article', 'job'), field specs ('title:str,price:float'), or JSON schema file")
     crawl_parser.add_argument("--max-pages", type=int, default=3, help="Maximum pages to crawl (default: 3)")
     crawl_parser.add_argument("--out", required=True, help="Output filepath (.json, .csv, or .md)")
     crawl_parser.add_argument("--ignore-robots", action="store_true", help="Bypass robots.txt restrictions")
@@ -158,10 +160,12 @@ def main():
             print(f"[ERROR] {result.error_message}")
             sys.exit(1)
 
-        print(f"[AGENT] Running AI extraction with prompt: '{args.prompt}'...")
+        schema_arg = getattr(args, "schema", None)
+        schema_info = f" with schema: '{schema_arg}'" if schema_arg else ""
+        print(f"[AGENT] Running AI extraction with prompt: '{args.prompt}'{schema_info}...")
         try:
             ai_extractor = AIExtractor()
-            extracted_data = ai_extractor.extract(result.clean_text, args.prompt)
+            extracted_data = ai_extractor.extract(result.clean_text, args.prompt, schema=schema_arg)
         except Exception as e:
             print(f"[ERROR] {str(e)}")
             sys.exit(1)
@@ -212,10 +216,12 @@ def main():
     elif args.command == "crawl":
         from src.crawler.crawler import MultiPageCrawler
 
-        print(f"[AGENT] Starting multi-page crawl starting at: {args.url} (max_pages={args.max_pages})")
+        schema_arg = getattr(args, "schema", None)
+        schema_info = f" with schema: '{schema_arg}'" if schema_arg else ""
+        print(f"[AGENT] Starting multi-page crawl starting at: {args.url} (max_pages={args.max_pages}){schema_info}")
         crawler = MultiPageCrawler(fetcher=fetcher)
 
-        records = crawler.crawl_and_extract(args.url, args.prompt, max_pages=args.max_pages)
+        records = crawler.crawl_and_extract(args.url, args.prompt, max_pages=args.max_pages, schema=schema_arg)
         print(f"[AGENT] Crawl complete. Extracted a total of {len(records)} record(s) across pages.")
 
         out_path = args.out

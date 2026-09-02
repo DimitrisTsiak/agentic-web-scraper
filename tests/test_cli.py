@@ -20,5 +20,29 @@ class TestCLIWorkflow(unittest.TestCase):
         self.assertEqual(args.url, "https://example.com")
         self.assertEqual(args.container, ".item")
 
+    def test_cli_ai_extract_with_schema(self):
+        parser = build_cli()
+        args = parser.parse_args([
+            "ai-extract", 
+            "--url", "https://example.com", 
+            "--prompt", "Extract products", 
+            "--schema", "product", 
+            "--out", "out.json"
+        ])
+        self.assertEqual(args.command, "ai-extract")
+        self.assertEqual(args.schema, "product")
+
+    def test_cli_crawl_with_schema(self):
+        parser = build_cli()
+        args = parser.parse_args([
+            "crawl", 
+            "--url", "https://example.com", 
+            "--prompt", "Extract jobs", 
+            "--schema", "title:str,salary:float", 
+            "--out", "out.csv"
+        ])
+        self.assertEqual(args.command, "crawl")
+        self.assertEqual(args.schema, "title:str,salary:float")
+
 if __name__ == "__main__":
     unittest.main()
