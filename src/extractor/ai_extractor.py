@@ -47,7 +47,8 @@ class AIExtractor:
         self, 
         clean_text: str, 
         instruction: str, 
-        schema: Optional[Any] = None
+        schema: Optional[Any] = None,
+        allow_file_lookup: bool = False
     ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Extracts structured data from clean webpage text using Google Gen AI SDK.
@@ -59,7 +60,7 @@ class AIExtractor:
 
         resolved_model = None
         if schema is not None:
-            resolved_model = resolve_schema(schema)
+            resolved_model = resolve_schema(schema, allow_file_lookup=allow_file_lookup)
 
         try:
             client = genai.Client(api_key=key)

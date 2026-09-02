@@ -119,5 +119,20 @@ def test_ai_extract_endpoint_with_schema(mock_fetcher_cls, mock_extractor_cls):
     data = response.json()
     assert data["count"] == 1
     assert data["records"][0]["title"] == "Python Book"
-    mock_extractor.extract.assert_called_once_with("Page with books", "Extract products", schema="product")
+    mock_extractor.extract.assert_called_once_with(
+        "Page with books", "Extract products", schema="product", allow_file_lookup=False
+    )
+
+def test_ai_extract_rejects_arbitrary_file_preset():
+    response = client.post(
+        "/api/ai-extract",
+        json={
+            "url": "https://example.com",
+            "prompt": "Extract products",
+            "schema_preset": "../../sensitive_config.json"
+        }
+    )
+    assert response.status_code == 400
+    assert "Invalid schema_preset" in response.json()["detail"]
+
 

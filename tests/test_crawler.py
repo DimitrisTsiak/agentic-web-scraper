@@ -74,7 +74,7 @@ class TestMultiPageCrawler(unittest.TestCase):
 
         self.assertEqual(len(records), 1)
         mock_ai_extractor.extract.assert_called_once_with(
-            "Page 1 Content", "Extract items", schema="product"
+            "Page 1 Content", "Extract items", schema="product", allow_file_lookup=False
         )
 
 if __name__ == "__main__":

@@ -86,18 +86,15 @@ def parse_field_spec_string(spec: str) -> Dict[str, Any]:
 
     pairs = [p.strip() for p in spec.split(",") if p.strip()]
     for pair in pairs:
-        if ":" in pair:
-            name, type_str = pair.split(":", 1)
-            name = name.strip()
-            type_str = type_str.strip().lower()
-            if type_str in TYPE_MAP:
-                field_definitions[name] = TYPE_MAP[type_str]
-            else:
-                # Default to optional string if unknown
-                field_definitions[name] = (Optional[str], None)
+        if ":" not in pair:
+            return {}
+        name, type_str = pair.split(":", 1)
+        name = name.strip()
+        type_str = type_str.strip().lower()
+        if name.isidentifier() and type_str in TYPE_MAP:
+            field_definitions[name] = TYPE_MAP[type_str]
         else:
-            # If no type specified, default to optional string
-            field_definitions[pair.strip()] = (Optional[str], None)
+            return {}
 
     return field_definitions
 
@@ -127,12 +124,12 @@ def create_dynamic_schema(
         raise ValueError(f"Unsupported schema spec type: {type(spec)}")
 
     if not field_definitions:
-        raise ValueError("Cannot create dynamic schema with no fields.")
+        raise ValueError("Cannot create dynamic schema with no valid fields.")
 
     return create_model(model_name, **field_definitions)
 
 
-def resolve_schema(schema_input: Any) -> Type[BaseModel]:
+def resolve_schema(schema_input: Any, allow_file_lookup: bool = False) -> Type[BaseModel]:
     """
     Resolves a schema input into a Pydantic BaseModel class.
     
@@ -140,7 +137,7 @@ def resolve_schema(schema_input: Any) -> Type[BaseModel]:
       - A Pydantic BaseModel class
       - A preset name ('product', 'article', 'job')
       - A comma-separated type specification ('title:str,price:float')
-      - A filepath to a JSON schema file (.json)
+      - A filepath to a JSON schema file (.json) (only if allow_file_lookup=True)
       - A dictionary mapping field names to types
     """
     if schema_input is None:
@@ -158,12 +155,11 @@ def resolve_schema(schema_input: Any) -> Type[BaseModel]:
         if cleaned.lower() in PRESET_SCHEMAS:
             return PRESET_SCHEMAS[cleaned.lower()]
 
-        # Check if file path
-        if (cleaned.endswith(".json") or os.path.exists(cleaned)) and os.path.isfile(cleaned):
+        # Check if file path (restricted to CLI / explicit local calls)
+        if allow_file_lookup and (cleaned.endswith(".json") or os.path.exists(cleaned)) and os.path.isfile(cleaned):
             with open(cleaned, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    # Check if it's a mapping of {field: type}
                     return create_dynamic_schema(data)
                 raise ValueError(f"JSON schema file '{cleaned}' must contain a JSON object.")
 
@@ -177,8 +173,9 @@ def resolve_schema(schema_input: Any) -> Type[BaseModel]:
                 pass
 
         # Check if comma-separated field spec (e.g. 'title:str,price:float')
-        if ":" in cleaned:
-            return create_dynamic_schema(cleaned)
+        field_defs = parse_field_spec_string(cleaned)
+        if field_defs:
+            return create_model("DynamicItem", **field_defs)
 
         raise ValueError(
             f"Unrecognized schema '{schema_input}'. Available presets: {list(PRESET_SCHEMAS.keys())}, "

@@ -44,7 +44,7 @@ class MultiPageCrawler:
         return None
 
     def crawl_and_extract(
-        self, start_url: str, prompt: str, max_pages: int = 3, schema: Optional[Any] = None
+        self, start_url: str, prompt: str, max_pages: int = 3, schema: Optional[Any] = None, allow_file_lookup: bool = False
     ) -> List[Dict[str, Any]]:
         """
         Crawls up to max_pages starting from start_url, extracting structured items on each page.
@@ -67,7 +67,9 @@ class MultiPageCrawler:
 
             # Extract data from current page using AI
             try:
-                page_data = self.ai_extractor.extract(fetch_result.clean_text, prompt, schema=schema)
+                page_data = self.ai_extractor.extract(
+                    fetch_result.clean_text, prompt, schema=schema, allow_file_lookup=allow_file_lookup
+                )
                 if isinstance(page_data, list):
                     all_records.extend(page_data)
                 elif isinstance(page_data, dict):

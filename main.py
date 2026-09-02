@@ -165,7 +165,9 @@ def main():
         print(f"[AGENT] Running AI extraction with prompt: '{args.prompt}'{schema_info}...")
         try:
             ai_extractor = AIExtractor()
-            extracted_data = ai_extractor.extract(result.clean_text, args.prompt, schema=schema_arg)
+            extracted_data = ai_extractor.extract(
+                result.clean_text, args.prompt, schema=schema_arg, allow_file_lookup=True
+            )
         except Exception as e:
             print(f"[ERROR] {str(e)}")
             sys.exit(1)
@@ -221,7 +223,9 @@ def main():
         print(f"[AGENT] Starting multi-page crawl starting at: {args.url} (max_pages={args.max_pages}){schema_info}")
         crawler = MultiPageCrawler(fetcher=fetcher)
 
-        records = crawler.crawl_and_extract(args.url, args.prompt, max_pages=args.max_pages, schema=schema_arg)
+        records = crawler.crawl_and_extract(
+            args.url, args.prompt, max_pages=args.max_pages, schema=schema_arg, allow_file_lookup=True
+        )
         print(f"[AGENT] Crawl complete. Extracted a total of {len(records)} record(s) across pages.")
 
         out_path = args.out

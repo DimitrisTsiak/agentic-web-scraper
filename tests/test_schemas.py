@@ -68,3 +68,19 @@ def test_resolve_schema():
     # 5. Invalid
     with pytest.raises(ValueError):
         resolve_schema("nonexistent_preset_xyz")
+
+def test_resolve_schema_file_lookup_security(tmp_path):
+    # Create temporary json schema file
+    schema_file = tmp_path / "custom_schema.json"
+    schema_file.write_text('{"item": "str", "cost": "float"}', encoding="utf-8")
+
+    # Disallowed by default (security protection for API)
+    with pytest.raises(ValueError) as exc:
+        resolve_schema(str(schema_file), allow_file_lookup=False)
+    assert "Unrecognized schema" in str(exc.value)
+
+    # Allowed when explicitly enabled (CLI usage)
+    model = resolve_schema(str(schema_file), allow_file_lookup=True)
+    assert issubclass(model, BaseModel)
+    assert "item" in model.model_fields
+    assert "cost" in model.model_fields

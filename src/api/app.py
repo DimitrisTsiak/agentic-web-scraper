@@ -94,15 +94,25 @@ def extract_rules(req: ExtractRequest):
         "records": records,
     }
 
+from src.extractor.schemas import PRESET_SCHEMAS
+
 def _resolve_request_schema(preset: Optional[str], fields: Optional[Dict[str, str]]) -> Optional[Any]:
     if preset:
-        return preset
+        cleaned = preset.strip().lower()
+        if cleaned not in PRESET_SCHEMAS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid schema_preset '{preset}'. Supported presets: {sorted(list(PRESET_SCHEMAS.keys()))}"
+            )
+        return cleaned
     if fields:
         return fields
     return None
 
 @app.post("/api/ai-extract")
 def extract_ai(req: AIExtractRequest):
+    schema_arg = _resolve_request_schema(req.schema_preset, req.schema_fields)
+
     fetcher = StaticFetcher(ignore_robots=req.ignore_robots)
     res = fetcher.fetch(req.url)
     if not res.success:
@@ -110,8 +120,7 @@ def extract_ai(req: AIExtractRequest):
 
     try:
         extractor = AIExtractor()
-        schema_arg = _resolve_request_schema(req.schema_preset, req.schema_fields)
-        data = extractor.extract(res.clean_text, req.prompt, schema=schema_arg)
+        data = extractor.extract(res.clean_text, req.prompt, schema=schema_arg, allow_file_lookup=False)
         records = data if isinstance(data, list) else [data]
         return {
             "url": req.url,
@@ -119,6 +128,8 @@ def extract_ai(req: AIExtractRequest):
             "count": len(records),
             "records": records,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -162,7 +173,9 @@ def _run_crawl_task(task_id: str, req: CrawlRequest):
 
     try:
         schema_arg = _resolve_request_schema(req.schema_preset, req.schema_fields)
-        records = crawler.crawl_and_extract(req.url, req.prompt, max_pages=req.max_pages, schema=schema_arg)
+        records = crawler.crawl_and_extract(
+            req.url, req.prompt, max_pages=req.max_pages, schema=schema_arg, allow_file_lookup=False
+        )
         with tasks_lock:
             tasks_db[task_id].status = "completed"
             tasks_db[task_id].records_count = len(records)
@@ -174,6 +187,9 @@ def _run_crawl_task(task_id: str, req: CrawlRequest):
 
 @app.post("/api/crawl", response_model=TaskStatusResponse)
 def start_crawl(req: CrawlRequest, background_tasks: BackgroundTasks):
+    # Validate schema upfront before creating background task
+    _resolve_request_schema(req.schema_preset, req.schema_fields)
+
     task_id = str(uuid.uuid4())
     task_status = TaskStatusResponse(
         task_id=task_id,
