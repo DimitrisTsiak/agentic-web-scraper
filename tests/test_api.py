@@ -12,6 +12,25 @@ def test_root_endpoint():
     assert data["status"] == "online"
     assert "Web Scraper Agent API" in data["service"]
 
+def test_cors_allowed_and_blocked_origins():
+    res_allowed = client.options(
+        "/",
+        headers={
+            "Origin": "http://localhost:8501",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert res_allowed.headers.get("access-control-allow-origin") == "http://localhost:8501"
+
+    res_blocked = client.options(
+        "/",
+        headers={
+            "Origin": "http://malicious-site.com",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert res_blocked.headers.get("access-control-allow-origin") is None
+
 @patch("src.api.app.StaticFetcher")
 def test_fetch_endpoint(mock_fetcher_cls):
     mock_instance = MagicMock()

@@ -1,8 +1,12 @@
+import os
 import uuid
 import threading
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from src.fetcher.static_fetcher import StaticFetcher
 from src.extractor.rule_extractor import RuleExtractor
@@ -26,10 +30,19 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Configure CORS safely: allow local frontends by default or override via CORS_ORIGINS
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:8501,http://127.0.0.1:8501,http://localhost:3000")
+if cors_origins_env.strip() == "*":
+    allowed_origins = ["*"]
+    allow_credentials = False
+else:
+    allowed_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+    allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
