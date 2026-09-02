@@ -1,8 +1,10 @@
 import time
 import threading
-from urllib.parse import urlparse
+import requests
+from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
 from typing import Dict, Tuple, Optional
+from src.safety.url_validator import validate_url
 
 DEFAULT_USER_AGENT = "WebScraperAgent/1.0 (+https://github.com/web-scraper-agent)"
 DEFAULT_MIN_DELAY_SECONDS = 1.0
@@ -23,6 +25,51 @@ class DomainRateLimiter:
         parsed = urlparse(url)
         return parsed.netloc.lower()
 
+    def _fetch_and_parse_robots(self, robots_url: str, timeout: float = 3.0) -> RobotFileParser:
+        """
+        Safely fetches and parses robots.txt with SSRF validation and redirect inspection.
+        Never calls unvalidated urllib.request.urlopen.
+        """
+        rfp = RobotFileParser()
+        rfp.set_url(robots_url)
+
+        is_safe, _ = validate_url(robots_url)
+        if not is_safe:
+            rfp.parse(["User-agent: *", "Disallow: /"])
+            return rfp
+
+        current_url = robots_url
+        headers = {"User-Agent": self.user_agent}
+
+        try:
+            for _ in range(3):
+                is_safe, _ = validate_url(current_url)
+                if not is_safe:
+                    rfp.parse(["User-agent: *", "Disallow: /"])
+                    return rfp
+
+                resp = requests.get(current_url, headers=headers, timeout=timeout, allow_redirects=False)
+
+                if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
+                    loc = resp.headers.get("Location")
+                    if not loc:
+                        break
+                    current_url = urljoin(current_url, loc)
+                    continue
+
+                if resp.status_code == 200:
+                    rfp.parse(resp.text.splitlines())
+                elif resp.status_code in (401, 403):
+                    rfp.parse(["User-agent: *", "Disallow: /"])
+                elif resp.status_code == 404:
+                    rfp.parse([])
+                break
+
+        except Exception:
+            rfp.parse([])
+
+        return rfp
+
     def is_allowed_by_robots(self, url: str, fetch_timeout: float = 3.0) -> Tuple[bool, Optional[float]]:
         """
         Check if the URL is allowed by robots.txt and get any crawl-delay directive.
@@ -34,14 +81,7 @@ class DomainRateLimiter:
 
         with self._lock:
             if domain not in self._robot_parsers:
-                rfp = RobotFileParser()
-                rfp.set_url(robots_url)
-                try:
-                    rfp.read()
-                except Exception:
-                    # If robots.txt cannot be fetched or parsed, default to permissive but cautious
-                    pass
-                self._robot_parsers[domain] = rfp
+                self._robot_parsers[domain] = self._fetch_and_parse_robots(robots_url, timeout=fetch_timeout)
 
             rfp = self._robot_parsers[domain]
 
