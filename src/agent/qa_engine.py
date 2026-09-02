@@ -39,7 +39,7 @@ class AIQAEngine:
             )
         return key
 
-    def answer_question(self, clean_text: str, question: str, max_text_length: int = 15000) -> Dict[str, Any]:
+    def answer_question(self, clean_text: str, question: str, max_text_length: int = 100000) -> Dict[str, Any]:
         """
         Answers a user question based on webpage text using the Google Gen AI SDK.
         Returns a dict containing 'answer', 'model', and 'content_length'.

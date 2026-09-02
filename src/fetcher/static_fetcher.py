@@ -1,6 +1,7 @@
 import time
 import requests
 from typing import Optional, Dict
+from urllib.parse import urljoin
 from src.safety.url_validator import validate_url
 from src.safety.rate_limiter import DomainRateLimiter
 from src.safety.sanitizer import HTMLSanitizer
@@ -16,83 +17,103 @@ DEFAULT_HEADERS = {
 class StaticFetcher:
     """
     Lightweight, fast HTTP fetcher with integrated safety checks,
-    robots.txt compliance, and automatic content sanitization.
+    robots.txt compliance, manual safe redirect inspection, and automatic content sanitization.
     """
     def __init__(self, rate_limiter: Optional[DomainRateLimiter] = None, timeout: float = 10.0, ignore_robots: bool = False):
         self.rate_limiter = rate_limiter or DomainRateLimiter()
         self.timeout = timeout
         self.ignore_robots = ignore_robots
 
-    def fetch(self, url: str, extra_headers: Optional[Dict[str, str]] = None) -> FetchResult:
-        # 1. Safety Check: SSRF and Protocol Validation
-        is_safe, reason = validate_url(url)
-        if not is_safe:
-            return FetchResult(
-                url=url,
-                status_code=400,
-                success=False,
-                error_message=f"Safety violation: {reason}"
-            )
-
-        # 2. Safety Check: Rate Limiting & Robots.txt
-        try:
-            if not self.ignore_robots:
-                self.rate_limiter.wait_if_needed(url)
-        except PermissionError as e:
-            return FetchResult(
-                url=url,
-                status_code=403,
-                success=False,
-                error_message=str(e)
-            )
-
-
+    def fetch(self, url: str, extra_headers: Optional[Dict[str, str]] = None, max_redirects: int = 5) -> FetchResult:
         headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
         start_time = time.time()
+        current_url = url
+        redirect_count = 0
 
-        try:
-            response = requests.get(url, headers=headers, timeout=self.timeout, allow_redirects=True)
-            elapsed = time.time() - start_time
+        while True:
+            # 1. Safety Check: SSRF and Protocol Validation on current URL
+            is_safe, reason = validate_url(current_url)
+            if not is_safe:
+                return FetchResult(
+                    url=current_url,
+                    status_code=400,
+                    success=False,
+                    error_message=f"Safety violation: {reason}"
+                )
 
-            # 3. Safety Check: Final destination URL check if redirected
-            if response.history:
-                final_is_safe, final_reason = validate_url(response.url)
-                if not final_is_safe:
+            # 2. Safety Check: Rate Limiting & Robots.txt
+            try:
+                if not self.ignore_robots:
+                    self.rate_limiter.wait_if_needed(current_url)
+            except PermissionError as e:
+                return FetchResult(
+                    url=current_url,
+                    status_code=403,
+                    success=False,
+                    error_message=str(e)
+                )
+
+            # 3. Perform request with allow_redirects=False to safely inspect every hop
+            try:
+                response = requests.get(
+                    current_url, 
+                    headers=headers, 
+                    timeout=self.timeout, 
+                    allow_redirects=False
+                )
+            except requests.RequestException as e:
+                elapsed = time.time() - start_time
+                return FetchResult(
+                    url=current_url,
+                    status_code=500,
+                    success=False,
+                    error_message=f"Request failed: {str(e)}",
+                    elapsed_seconds=elapsed
+                )
+
+            # 4. Handle redirects safely: validate destination before making the next connection
+            if response.is_redirect or response.is_permanent_redirect or response.status_code in (301, 302, 303, 307, 308):
+                redirect_count += 1
+                if redirect_count > max_redirects:
+                    elapsed = time.time() - start_time
                     return FetchResult(
-                        url=response.url,
+                        url=current_url,
                         status_code=400,
                         success=False,
-                        error_message=f"Redirect safety violation: {final_reason}"
+                        error_message=f"Too many redirects (exceeded limit of {max_redirects})",
+                        elapsed_seconds=elapsed
                     )
 
-            if response.status_code == 200:
-                raw_html = response.text
-                clean_text = HTMLSanitizer.extract_clean_text(raw_html)
-                return FetchResult(
-                    url=response.url,
-                    status_code=response.status_code,
-                    success=True,
-                    raw_html=raw_html,
-                    clean_text=clean_text,
-                    elapsed_seconds=elapsed,
-                    headers=dict(response.headers)
-                )
-            else:
-                return FetchResult(
-                    url=response.url,
-                    status_code=response.status_code,
-                    success=False,
-                    error_message=f"HTTP {response.status_code}: {response.reason}",
-                    elapsed_seconds=elapsed,
-                    headers=dict(response.headers)
-                )
+                location = response.headers.get("Location")
+                if not location:
+                    break
 
-        except requests.RequestException as e:
-            elapsed = time.time() - start_time
+                current_url = urljoin(current_url, location)
+                continue
+
+            # Non-redirect response reached
+            break
+
+        elapsed = time.time() - start_time
+
+        if response.status_code == 200:
+            raw_html = response.text
+            clean_text = HTMLSanitizer.extract_clean_text(raw_html)
             return FetchResult(
-                url=url,
-                status_code=500,
+                url=current_url,
+                status_code=response.status_code,
+                success=True,
+                raw_html=raw_html,
+                clean_text=clean_text,
+                elapsed_seconds=elapsed,
+                headers=dict(response.headers)
+            )
+        else:
+            return FetchResult(
+                url=current_url,
+                status_code=response.status_code,
                 success=False,
-                error_message=f"Request failed: {str(e)}",
-                elapsed_seconds=elapsed
+                error_message=f"HTTP {response.status_code}: {response.reason}",
+                elapsed_seconds=elapsed,
+                headers=dict(response.headers)
             )
