@@ -86,7 +86,14 @@ class StaticFetcher:
 
                 location = response.headers.get("Location")
                 if not location:
-                    break
+                    elapsed = time.time() - start_time
+                    return FetchResult(
+                        url=current_url,
+                        status_code=response.status_code,
+                        success=False,
+                        error_message="Redirect response missing Location header.",
+                        elapsed_seconds=elapsed,
+                    )
 
                 current_url = urljoin(current_url, location)
                 continue
