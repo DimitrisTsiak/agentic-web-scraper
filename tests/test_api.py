@@ -135,4 +135,18 @@ def test_ai_extract_rejects_arbitrary_file_preset():
     assert response.status_code == 400
     assert "Invalid schema_preset" in response.json()["detail"]
 
+def test_delete_task_endpoint():
+    with patch("src.api.app.MultiPageCrawler"), patch("src.api.app.StaticFetcher"):
+        res = client.post("/api/crawl", json={"url": "https://example.com/crawl", "prompt": "items", "max_pages": 1})
+        assert res.status_code == 200
+        task_id = res.json()["task_id"]
+
+        del_res = client.delete(f"/api/tasks/{task_id}")
+        assert del_res.status_code == 200
+        assert del_res.json()["status"] == "deleted"
+
+        get_res = client.get(f"/api/tasks/{task_id}")
+        assert get_res.status_code == 404
+
+
 

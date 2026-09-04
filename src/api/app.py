@@ -47,9 +47,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory background task registry
-tasks_lock = threading.Lock()
-tasks_db: Dict[str, TaskStatusResponse] = {}
+from .storage import TaskStorage
+
+# Persistent SQLite background task store
+task_storage = TaskStorage()
 
 @app.get("/")
 def read_root():
@@ -165,8 +166,7 @@ def answer_web_qa(req: QARequest):
         )
 
 def _run_crawl_task(task_id: str, req: CrawlRequest):
-    with tasks_lock:
-        tasks_db[task_id].status = "running"
+    task_storage.update_task_status(task_id, status="running")
 
     fetcher = StaticFetcher(ignore_robots=req.ignore_robots)
     crawler = MultiPageCrawler(fetcher=fetcher)
@@ -176,14 +176,11 @@ def _run_crawl_task(task_id: str, req: CrawlRequest):
         records = crawler.crawl_and_extract(
             req.url, req.prompt, max_pages=req.max_pages, schema=schema_arg, allow_file_lookup=False
         )
-        with tasks_lock:
-            tasks_db[task_id].status = "completed"
-            tasks_db[task_id].records_count = len(records)
-            tasks_db[task_id].records = records
+        task_storage.update_task_status(
+            task_id, status="completed", records_count=len(records), records=records
+        )
     except Exception as e:
-        with tasks_lock:
-            tasks_db[task_id].status = "failed"
-            tasks_db[task_id].error_message = str(e)
+        task_storage.update_task_status(task_id, status="failed", error_message=str(e))
 
 @app.post("/api/crawl", response_model=TaskStatusResponse)
 def start_crawl(req: CrawlRequest, background_tasks: BackgroundTasks):
@@ -191,28 +188,25 @@ def start_crawl(req: CrawlRequest, background_tasks: BackgroundTasks):
     _resolve_request_schema(req.schema_preset, req.schema_fields)
 
     task_id = str(uuid.uuid4())
-    task_status = TaskStatusResponse(
-        task_id=task_id,
-        status="pending",
-        url=req.url,
-        records_count=0,
-        records=None,
-        error_message=None,
-    )
-    with tasks_lock:
-        tasks_db[task_id] = task_status
+    task_status = task_storage.create_task(task_id=task_id, url=req.url)
 
     background_tasks.add_task(_run_crawl_task, task_id, req)
     return task_status
 
 @app.get("/api/tasks/{task_id}", response_model=TaskStatusResponse)
 def get_task_status(task_id: str):
-    with tasks_lock:
-        if task_id not in tasks_db:
-            raise HTTPException(status_code=404, detail="Task not found")
-        return tasks_db[task_id]
+    task = task_storage.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
 
 @app.get("/api/tasks", response_model=List[TaskStatusResponse])
 def list_tasks():
-    with tasks_lock:
-        return list(tasks_db.values())
+    return task_storage.list_tasks(limit=50, include_records=False)
+
+@app.delete("/api/tasks/{task_id}")
+def delete_task(task_id: str):
+    deleted = task_storage.delete_task(task_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"status": "deleted", "task_id": task_id}

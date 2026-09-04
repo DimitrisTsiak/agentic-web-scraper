@@ -48,7 +48,8 @@ class AIExtractor:
         clean_text: str, 
         instruction: str, 
         schema: Optional[Any] = None,
-        allow_file_lookup: bool = False
+        allow_file_lookup: bool = False,
+        max_text_length: int = 100000 
     ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Extracts structured data from clean webpage text using Google Gen AI SDK.
@@ -56,7 +57,7 @@ class AIExtractor:
         using Pydantic models.
         """
         key = self._get_api_key()
-        prompt_text = f"{SYSTEM_PROMPT}\n\nUSER EXTRACTION GOAL: {instruction}\n\nWEBPAGE CONTENT:\n{clean_text[:15000]}"
+        prompt_text = f"{SYSTEM_PROMPT}\n\nUSER EXTRACTION GOAL: {instruction}\n\nWEBPAGE CONTENT:\n{clean_text[:max_text_length]}"
 
         resolved_model = None
         if schema is not None:
