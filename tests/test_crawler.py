@@ -77,5 +77,46 @@ class TestMultiPageCrawler(unittest.TestCase):
             "Page 1 Content", "Extract items", schema="product", allow_file_lookup=False
         )
 
+    def test_crawl_retries_transient_failure_and_succeeds(self):
+        mock_fetcher = MagicMock()
+        mock_ai_extractor = MagicMock()
+
+        # Attempt 1: 503 Service Unavailable
+        fail_res = FetchResult(
+            url="https://example.com/page/1",
+            status_code=503,
+            success=False,
+            error_message="HTTP 503: Service Unavailable"
+        )
+        # Attempt 2: 200 OK
+        success_res = FetchResult(
+            url="https://example.com/page/1",
+            status_code=200,
+            success=True,
+            raw_html='<html><body><h1>Recovered</h1></body></html>',
+            clean_text="Recovered Page Content"
+        )
+
+        mock_fetcher.fetch.side_effect = [fail_res, success_res]
+        mock_ai_extractor.extract.return_value = [{"title": "Recovered Item"}]
+
+        crawler = MultiPageCrawler(fetcher=mock_fetcher, ai_extractor=mock_ai_extractor)
+        # Use retry_delay=0.01 for fast unit testing
+        records = crawler.crawl_and_extract(
+            "https://example.com/page/1", "Extract", max_pages=1, max_retries=3, retry_delay=0.01
+        )
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["title"], "Recovered Item")
+        self.assertEqual(mock_fetcher.fetch.call_count, 2)
+
+    def test_find_next_page_ignores_dummy_anchors_and_javascript(self):
+        crawler = MultiPageCrawler(fetcher=MagicMock(), ai_extractor=MagicMock())
+        html_hash = '<html><body><a class="next" href="#">Next</a></body></html>'
+        self.assertIsNone(crawler._find_next_page_url("https://example.com", html_hash))
+
+        html_js = '<html><body><a class="next" href="javascript:void(0)">Next</a></body></html>'
+        self.assertIsNone(crawler._find_next_page_url("https://example.com", html_js))
+
 if __name__ == "__main__":
     unittest.main()
