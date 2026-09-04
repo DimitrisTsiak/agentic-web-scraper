@@ -131,7 +131,7 @@ def main():
             print("[ERROR] Invalid --fields argument format. Expected 'field1=selector1,field2=selector2'")
             sys.exit(1)
 
-        records = RuleExtractor.extract_list(result.raw_html, args.container, fields_map)
+        records = RuleExtractor.extract_list(result.raw_html, args.container, fields_map, base_url=args.url)
         print(f"[AGENT] Extracted {len(records)} record(s).")
 
         out_path = args.out

@@ -191,7 +191,7 @@ with tab_extract:
                             k, v = pair.split("=", 1)
                             fields_dict[k.strip()] = v.strip()
                     
-                    records = RuleExtractor.extract_list(res.raw_html, container_sel, fields_dict)
+                    records = RuleExtractor.extract_list(res.raw_html, container_sel, fields_dict, base_url=url)
                     st.session_state["extracted_records"] = records
 
     # Display Extracted Results

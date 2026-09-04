@@ -87,7 +87,7 @@ def extract_rules(req: ExtractRequest):
     if not res.success:
         raise HTTPException(status_code=400, detail=res.error_message or "Fetch failed")
 
-    records = RuleExtractor.extract_list(res.raw_html, req.container, req.fields)
+    records = RuleExtractor.extract_list(res.raw_html, req.container, req.fields, base_url=req.url)
     return {
         "url": req.url,
         "count": len(records),

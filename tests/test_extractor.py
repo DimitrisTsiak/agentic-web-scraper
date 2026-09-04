@@ -60,5 +60,33 @@ class TestExtractor(unittest.TestCase):
             md_table = DataExporter.to_markdown_table(records)
             self.assertIn("| Item 1 | $10 |", md_table)
 
+    def test_extract_list_resolves_relative_urls(self):
+        results = RuleExtractor.extract_list(
+            self.sample_html,
+            item_selector=".product-card",
+            fields={
+                "name": ".title",
+                "link": "a::attr(href)"
+            },
+            base_url="https://example.com/store/catalog/page.html"
+        )
+        self.assertEqual(len(results), 2)
+        # Root-relative link '/item/a' resolved against base_url
+        self.assertEqual(results[0]["link"], "https://example.com/item/a")
+        self.assertEqual(results[1]["link"], "https://example.com/item/b")
+
+    def test_extract_single_resolves_relative_urls(self):
+        html = '<div class="product"><a href="../details.html">Details</a><img src="../../img.png"></div>'
+        result = RuleExtractor.extract_single(
+            html,
+            fields={
+                "link": "a::attr(href)",
+                "image": "img::attr(src)"
+            },
+            base_url="https://example.com/a/b/index.html"
+        )
+        self.assertEqual(result["link"], "https://example.com/a/details.html")
+        self.assertEqual(result["image"], "https://example.com/img.png")
+
 if __name__ == "__main__":
     unittest.main()
